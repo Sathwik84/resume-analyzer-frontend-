@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Resume Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/chart.min.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col items-center justify-center">
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-3xl">
+        <h1 class="text-3xl font-bold text-center mb-4">📄 AI Resume Analyzer</h1>
+        <p class="text-gray-600 text-center mb-6">Upload your resume and get instant AI feedback with scores and suggestions.</p>
+
+        <form method="POST" enctype="multipart/form-data" class="space-y-4">
+            <div>
+                <label class="block text-gray-700 font-semibold mb-1">Upload Resume (PDF)</label>
+                <input type="file" name="resume" required class="w-full border border-gray-300 rounded-lg p-2">
+            </div>
+            <div>
+                <label class="block text-gray-700 font-semibold mb-1">Job Description (Optional)</label>
+                <textarea name="job_desc" placeholder="Paste the job description here..." class="w-full border border-gray-300 rounded-lg p-2 h-24"></textarea>
+            </div>
+            <button class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg">Analyze Resume</button>
+        </form>
+
+        {% if result %}
+        <div class="mt-6">
+            <h2 class="text-xl font-bold mb-2">Scores:</h2>
+            <canvas id="scoreChart" class="mb-4"></canvas>
+
+            <h2 class="text-xl font-bold mb-2">Suggestions to Improve:</h2>
+            <ul class="list-disc pl-6 text-gray-700">
+                {% for s in result.suggestions %}
+                <li>{{ s }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <script>
+            const ctx = document.getElementById('scoreChart');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Resume Score', 'Job Fit Score'],
+                    datasets: [{
+                        label: 'Score',
+                        data: [{{ result.resume_score }}, {{ result.job_fit_score }}],
+                        backgroundColor: ['#3b82f6', '#10b981']
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true, max: 100 } } }
+            });
+        </script>
+        {% endif %}
+    </div>
+</body>
+</html>
