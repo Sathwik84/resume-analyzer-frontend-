@@ -1,110 +1,180 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
-    <meta charset="UTF-8" />
-    <title>AI Resume Analyzer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="chart.min.js"></script>
-    <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Resume Analyzer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="style.css" />
+  <script src="chart.min.js"></script>
+  <style>
+    /* Smooth fade-in animation */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .animate-fadeInUp {
+      animation: fadeInUp 0.6s ease forwards;
+    }
+  </style>
 </head>
-<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col items-center justify-center">
-    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-3xl">
-        <h1 class="text-3xl font-bold text-center mb-4">📄 AI Resume Analyzer</h1>
-        <p class="text-gray-600 text-center mb-6">Upload your resume and get instant AI feedback with scores and suggestions.</p>
+<body class="bg-gradient-to-tr from-purple-100 via-white to-purple-100 min-h-screen flex items-center justify-center px-4 py-10">
+  <div
+    class="bg-white rounded-xl shadow-2xl p-8 max-w-4xl w-full animate-fadeInUp"
+  >
+    <header class="mb-6 text-center">
+      <h1 class="text-4xl font-extrabold text-purple-700 mb-2 drop-shadow-md">
+        📄 AI Resume Analyzer
+      </h1>
+      <p class="text-gray-600 max-w-lg mx-auto">
+        Upload your resume (PDF) and get an instant, AI-generated score & suggestions.
+      </p>
+    </header>
 
-        <form id="uploadForm" class="space-y-4">
-            <div>
-                <label class="block text-gray-700 font-semibold mb-1">Upload Resume (PDF)</label>
-                <input type="file" id="resumeFile" name="resume" required class="w-full border border-gray-300 rounded-lg p-2" />
-            </div>
-            <div>
-                <label class="block text-gray-700 font-semibold mb-1">Job Description (Optional)</label>
-                <textarea id="jobDesc" name="job_desc" placeholder="Paste the job description here..." class="w-full border border-gray-300 rounded-lg p-2 h-24"></textarea>
-            </div>
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg">Analyze Resume</button>
-        </form>
+    <div id="appContent" class="space-y-8">
+      <form
+        id="analyzeForm"
+        enctype="multipart/form-data"
+        class="space-y-6"
+        autocomplete="off"
+      >
+        <label
+          for="resume"
+          class="block text-lg font-semibold text-gray-700"
+          >Upload Resume (PDF)</label
+        >
+        <input
+          type="file"
+          name="resume"
+          id="resume"
+          accept="application/pdf"
+          required
+          class="block w-full text-gray-700 border border-gray-300 rounded-lg cursor-pointer p-2 hover:border-purple-500 transition"
+        />
 
-        <div id="resultSection" class="mt-6 hidden">
-            <h2 class="text-xl font-bold mb-2">Scores:</h2>
-            <canvas id="scoreChart" class="mb-4"></canvas>
+        <button
+          type="submit"
+          class="w-full py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 shadow-md transition"
+          id="analyzeBtn"
+        >
+          Analyze Resume
+        </button>
+      </form>
 
-            <h2 class="text-xl font-bold mb-2">Suggestions to Improve:</h2>
-            <ul id="suggestionsList" class="list-disc pl-6 text-gray-700"></ul>
+      <section
+        id="results"
+        class="hidden bg-purple-50 border border-purple-300 rounded-lg p-6 shadow-inner"
+      >
+        <h2 class="text-2xl font-bold text-purple-700 mb-4">
+          Resume Score
+        </h2>
+        <canvas id="scoreChart" class="mb-6"></canvas>
+
+        <div>
+          <h3 class="text-xl font-semibold mb-2">Suggestions to Improve</h3>
+          <ul
+            id="suggestionsList"
+            class="list-disc list-inside text-gray-700 space-y-1 max-h-48 overflow-y-auto"
+          ></ul>
         </div>
+      </section>
     </div>
+  </div>
 
-    <script>
-        const form = document.getElementById('uploadForm');
-        const resultSection = document.getElementById('resultSection');
-        const suggestionsList = document.getElementById('suggestionsList');
-        const scoreChartCtx = document.getElementById('scoreChart').getContext('2d');
-        let chart;
+  <script>
+    // Check login
+    if (localStorage.getItem('loggedIn') !== 'true') {
+      alert('Please login first!');
+      window.location.href = 'login.html';
+    }
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+    const form = document.getElementById('analyzeForm');
+    const resultsSection = document.getElementById('results');
+    const suggestionsList = document.getElementById('suggestionsList');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    let chart;
 
-            const fileInput = document.getElementById('resumeFile');
-            if (!fileInput.files.length) {
-                alert('Please select a resume file');
-                return;
-            }
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-            const formData = new FormData();
-            formData.append('resume', fileInput.files[0]);
-            formData.append('job_desc', document.getElementById('jobDesc').value);
+      analyzeBtn.disabled = true;
+      analyzeBtn.textContent = 'Analyzing...';
 
-            try {
-                const response = await fetch('https://resume-analyzer-backend-jgi0.onrender.com/analyze', {
-                    method: 'POST',
-                    body: formData,
-                });
+      const formData = new FormData(form);
 
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
+      try {
+        const response = await fetch(
+          'https://resume-analyzer-backend-jgi0.onrender.com/analyze',
+          {
+            method: 'POST',
+            body: formData,
+          }
+        );
 
-                const data = await response.json();
+        if (!response.ok) {
+          alert('Failed to analyze resume. Please try again.');
+          analyzeBtn.disabled = false;
+          analyzeBtn.textContent = 'Analyze Resume';
+          return;
+        }
 
-                // Show the results section
-                resultSection.classList.remove('hidden');
+        const data = await response.json();
 
-                // Populate suggestions list
-                suggestionsList.innerHTML = '';
-                data.suggestions.forEach(s => {
-                    const li = document.createElement('li');
-                    li.textContent = s;
-                    suggestionsList.appendChild(li);
-                });
+        // Show results section
+        resultsSection.classList.remove('hidden');
 
-                // Draw or update chart
-                const scores = [data.resume_score, data.job_fit_score];
-                if (chart) {
-                    chart.data.datasets[0].data = scores;
-                    chart.update();
-                } else {
-                    chart = new Chart(scoreChartCtx, {
-                        type: 'bar',
-                        data: {
-                            labels: ['Resume Score', 'Job Fit Score'],
-                            datasets: [{
-                                label: 'Score',
-                                data: scores,
-                                backgroundColor: ['#3b82f6', '#10b981'],
-                            }],
-                        },
-                        options: {
-                            scales: {
-                                y: { beginAtZero: true, max: 100 }
-                            }
-                        },
-                    });
-                }
+        // Update suggestions list
+        suggestionsList.innerHTML = '';
+        if (data.suggestions && data.suggestions.length > 0) {
+          data.suggestions.forEach((s) => {
+            const li = document.createElement('li');
+            li.textContent = s;
+            suggestionsList.appendChild(li);
+          });
+        } else {
+          suggestionsList.innerHTML = '<li>No suggestions. Great job!</li>';
+        }
 
-            } catch (error) {
-                alert('Error analyzing resume: ' + error.message);
-                console.error(error);
-            }
+        // Draw chart
+        const ctx = document.getElementById('scoreChart').getContext('2d');
+        if (chart) chart.destroy();
+
+        chart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ['Resume Score', 'Job Fit Score'],
+            datasets: [
+              {
+                label: 'Score (out of 100)',
+                data: [data.resume_score || 0, data.job_fit_score || 0],
+                backgroundColor: ['#7c3aed', '#22c55e'],
+              },
+            ],
+          },
+          options: {
+            scales: {
+              y: { beginAtZero: true, max: 100 },
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: { enabled: true },
+            },
+          },
         });
-    </script>
+      } catch (error) {
+        alert('Error connecting to backend.');
+        console.error(error);
+      } finally {
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent = 'Analyze Resume';
+      }
+    });
+  </script>
 </body>
 </html>
